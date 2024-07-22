@@ -53,11 +53,14 @@ if uploaded_file is not None:
             week_row = ws.max_row + 2
 
             # ヘッダー行を作成
-            ws.cell(row=week_row, column=1, value='作業名')
+            header_cell = ws.cell(row=week_row, column=1, value='作業名')
+            header_cell.border = thin_border
+            header_cell.alignment = Alignment(horizontal='center', vertical='center')
             for i, day in enumerate(pd.date_range(start=week_start, end=week_end), start=2):
                 col_letter = get_column_letter(i)
                 cell = ws.cell(row=week_row, column=i, value=day.strftime('%Y-%m-%d'))
                 cell.font = Font(bold=True)  # 太文字
+                cell.border = thin_border  # 罫線を追加
                 ws.column_dimensions[col_letter].width = 15  # 列幅を設定
 
             # 各タスクの行を作成
@@ -65,13 +68,16 @@ if uploaded_file is not None:
             for index, row in df.iterrows():
                 # '工程'列のフィルタリングを追加
                 if row['工程'] in selected_tasks and row['終了予定日'] >= week_start and row['開始予定日'] <= week_end:
-                    ws.cell(row=task_row, column=1, value=row['作業名'])
+                    task_cell = ws.cell(row=task_row, column=1, value=row['作業名'])
+                    task_cell.border = thin_border
+                    task_cell.alignment = Alignment(horizontal='center', vertical='center')
                     task_days = (row['終了予定日'] - row['開始予定日']).days + 1
                     part_length = task_days // 3
                     part_remainder = task_days % 3
                     for i, day in enumerate(pd.date_range(start=week_start, end=week_end), start=2):
                         if row['開始予定日'] <= day <= row['終了予定日']:
                             cell = ws.cell(row=task_row, column=i)
+                            cell.border = thin_border  # 罫線を追加
                             # 最終日に「提出期限」と表示
                             if day == row['終了予定日']:
                                 cell.value = '提出期限'
@@ -84,14 +90,13 @@ if uploaded_file is not None:
                             else:
                                 fill_color = colors[2]
                             cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type='solid')
-                            cell.border = thin_border  # 罫線を追加
                     task_row += 1
 
         # 最初の2行が空行であれば削除
         if all(ws.cell(row=1, column=col).value is None for col in range(1, ws.max_column + 1)) and all(ws.cell(row=2, column=col).value is None for col in range(1, ws.max_column + 1)):
             ws.delete_rows(1, 2)
 
-        # 列幅を自動調整
+        # 列幅を自動調整（作業名の列は最低150px）
         for col in ws.columns:
             max_length = 0
             column = col[0].column_letter  # 列名を取得
@@ -101,8 +106,10 @@ if uploaded_file is not None:
                         max_length = len(cell.value)
                 except:
                     pass
-            adjusted_width = (max_length + 2)
+            adjusted_width = max((max_length + 2), 20) if column == 'A' else (max_length + 2)
             ws.column_dimensions[column].width = adjusted_width
+
+        ws.column_dimensions['A'].width = max(ws.column_dimensions['A'].width, 20)
 
         # バイナリデータとしてExcelファイルを保存
         output = io.BytesIO()
