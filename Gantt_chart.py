@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 from openpyxl.utils import get_column_letter
 import io
 
@@ -44,6 +44,8 @@ if uploaded_file is not None:
 
         # 色の設定
         colors = ['0DACDC', 'ECDA2F', 'F11D1A']
+        # 罫線の設定
+        thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
         # 週ごとのヘッダー行を作成
         for week_start in calendar_days:
@@ -54,7 +56,8 @@ if uploaded_file is not None:
             ws.cell(row=week_row, column=1, value='作業名')
             for i, day in enumerate(pd.date_range(start=week_start, end=week_end), start=2):
                 col_letter = get_column_letter(i)
-                ws.cell(row=week_row, column=i, value=day.strftime('%Y-%m-%d'))
+                cell = ws.cell(row=week_row, column=i, value=day.strftime('%Y-%m-%d'))
+                cell.font = Font(bold=True)  # 太文字
                 ws.column_dimensions[col_letter].width = 15  # 列幅を設定
 
             # 各タスクの行を作成
@@ -81,7 +84,25 @@ if uploaded_file is not None:
                             else:
                                 fill_color = colors[2]
                             cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type='solid')
+                            cell.border = thin_border  # 罫線を追加
                     task_row += 1
+
+        # 最初の2行が空行であれば削除
+        if all(ws.cell(row=1, column=col).value is None for col in range(1, ws.max_column + 1)) and all(ws.cell(row=2, column=col).value is None for col in range(1, ws.max_column + 1)):
+            ws.delete_rows(1, 2)
+
+        # 列幅を自動調整
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter  # 列名を取得
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column].width = adjusted_width
 
         # バイナリデータとしてExcelファイルを保存
         output = io.BytesIO()
