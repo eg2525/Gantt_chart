@@ -24,8 +24,8 @@ if uploaded_file is not None:
            ], axis=1)
 
     # データを日付形式に変換
-    df['開始予定日'] = pd.to_datetime(df['開始予定日'])
-    df['終了予定日'] = pd.to_datetime(df['終了予定日'])
+    df['開始予定日'] = pd.to_datetime(df['開始予定日'], errors='coerce')
+    df['終了予定日'] = pd.to_datetime(df['終了予定日'], errors='coerce')
 
     # '工程'列のユニークな値を取得し、チェックボックスを作成
     unique_tasks = df['工程'].unique()
@@ -66,6 +66,8 @@ if uploaded_file is not None:
         # 各作業のセルに色をつける
         for index, row in df.iterrows():
             if row['工程'] in selected_tasks:
+                if pd.isna(row['開始予定日']) or pd.isna(row['終了予定日']):
+                    continue
                 task_col = task_columns[row['作業名']]
                 start_idx = (row['開始予定日'] - calendar_start).days + 2
                 end_idx = (row['終了予定日'] - calendar_start).days + 2
