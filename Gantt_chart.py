@@ -69,8 +69,9 @@ if uploaded_file is not None:
                 task_col = task_columns[row['作業名']]
                 start_idx = (row['開始予定日'] - calendar_start).days + 2
                 end_idx = (row['終了予定日'] - calendar_start).days + 2
-                part_length = (end_idx - start_idx + 1) // 3
-                part_remainder = (end_idx - start_idx + 1) % 3
+                task_days = int(end_idx - start_idx + 1)  # 整数に変換
+                part_length = task_days // 3
+                part_remainder = task_days % 3
 
                 for i in range(start_idx, end_idx + 1):
                     cell = ws.cell(row=i, column=task_col)
