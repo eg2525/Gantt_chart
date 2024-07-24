@@ -32,9 +32,15 @@ if uploaded_file is not None:
     selected_tasks = st.multiselect('表示する工程を選択してください', unique_tasks, default=list(unique_tasks))
 
     if st.button('ガントチャート作成'):
+        # 選択された工程に関連する作業名をフィルタリング
+        filtered_df = df[df['工程'].isin(selected_tasks)]
+
+        # 欠損値を含む行を削除
+        filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
+
         # カレンダーの開始日と終了日を設定
-        calendar_start = df['開始予定日'].min()
-        calendar_end = df['終了予定日'].max()
+        calendar_start = filtered_df['開始予定日'].min()
+        calendar_end = filtered_df['終了予定日'].max()
         calendar_days = pd.date_range(start=calendar_start, end=calendar_end)
 
         # Excelファイルを作成
@@ -53,9 +59,6 @@ if uploaded_file is not None:
             cell = ws.cell(row=i, column=1, value=day.strftime('%Y-%m-%d'))
             cell.border = thin_border  # 罫線を追加
             cell.alignment = Alignment(horizontal='center', vertical='center')
-
-        # 選択された工程に関連する作業名をフィルタリング
-        filtered_df = df[df['工程'].isin(selected_tasks)]
 
         # 各作業名を列ヘッダーに設定
         task_columns = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
