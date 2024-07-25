@@ -17,11 +17,9 @@ if uploaded_file is not None:
     df = pd.read_csv(uploaded_file, encoding='cp932')
 
     # 不要な列を削除
-    df = df.drop(['レコードの開始行','標題','担当社員','担当者','レコード番号','更新者', '作成者', '更新日時', '作成日時', 'ステータス','プロジェクトコード', '関連者',
-             '削除依頼', '削除依頼者', '削除依頼理由',
-           '削除依頼日', 'ルックアップ(被相続人)', '被相続人:顧客コード', '顧客名&ﾌﾘｶﾞﾅ','サーバーアドレス', 'ルックアップ(相続人)', '相続人:顧客名', '相続人:顧客コード', '作業予定者','総予定工数', '工程リスト',
-           '解約事由', '解約日',
-           ], axis=1)
+    df = df.drop(['レコードの開始行', '標題', '担当社員', '担当者', 'レコード番号', '更新者', '作成者', '更新日時', '作成日時', 'ステータス', 'プロジェクトコード', '関連者',
+                  '削除依頼', '削除依頼者', '削除依頼理由', '削除依頼日', 'ルックアップ(被相続人)', '被相続人:顧客コード', '顧客名&ﾌﾘｶﾞﾅ', 'サーバーアドレス', 'ルックアップ(相続人)',
+                  '相続人:顧客名', '相続人:顧客コード', '作業予定者', '総予定工数', '工程リスト', '解約事由', '解約日'], axis=1)
 
     # データを日付形式に変換
     df['開始予定日'] = pd.to_datetime(df['開始予定日'], errors='coerce')
@@ -49,21 +47,9 @@ if uploaded_file is not None:
         # 罫線の設定
         thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-        # 日付を左一列に連続的に並べる
-        ws.cell(row=1, column=1, value='日付')
-        for i, day in enumerate(calendar_days, start=2):
-            cell = ws.cell(row=i, column=1, value=day.strftime('%Y-%m-%d'))
-            cell.border = thin_border  # 罫線を追加
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-
-        # 選択された工程に関連する作業名をフィルタリング
-        filtered_df = df[df['工程'].isin(selected_tasks)]
-
-        # 欠損値を含む行を削除
-        filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
-
         # 各作業名を列ヘッダーに設定
-        task_columns = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
+        ws.cell(row=1, column=1, value='日付')
+        task_columns = {task: idx+2 for idx, task in enumerate(df[df['工程'].isin(selected_tasks)]['作業名'].unique())}
         for task, col in task_columns.items():
             cell = ws.cell(row=1, column=col, value=task)
             cell.font = Font(bold=True)  # 太文字
@@ -71,7 +57,15 @@ if uploaded_file is not None:
             cell.alignment = Alignment(horizontal='center', vertical='center')
             ws.column_dimensions[get_column_letter(col)].width = 20  # 列幅を設定
 
+        # 日付を左一列に連続的に並べる
+        for i, day in enumerate(calendar_days, start=2):
+            cell = ws.cell(row=i, column=1, value=day.strftime('%Y-%m-%d'))
+            cell.border = thin_border  # 罫線を追加
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
         # 各作業のセルに色をつける
+        filtered_df = df[df['工程'].isin(selected_tasks)]
+        filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
         for index, row in filtered_df.iterrows():
             task_col = task_columns[row['作業名']]
             start_idx = (row['開始予定日'] - calendar_start).days // 7 + 2
