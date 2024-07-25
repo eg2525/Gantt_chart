@@ -26,22 +26,18 @@ if uploaded_file is not None:
     # データを日付形式に変換
     df['開始予定日'] = pd.to_datetime(df['開始予定日'], errors='coerce')
     df['終了予定日'] = pd.to_datetime(df['終了予定日'], errors='coerce')
+    df['相続開始日'] = pd.to_datetime(df['相続開始日'], errors='coerce')
 
     # '工程'列のユニークな値を取得し、チェックボックスを作成
     unique_tasks = df['工程'].unique()
     selected_tasks = st.multiselect('表示する工程を選択してください', unique_tasks, default=list(unique_tasks))
 
     if st.button('ガントチャート作成'):
-        # 選択された工程に関連する作業名をフィルタリング
-        filtered_df = df[df['工程'].isin(selected_tasks)]
-
-        # 欠損値を含む行を削除
-        filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
-
-        # カレンダーの開始日と終了日を設定
-        calendar_start = filtered_df['開始予定日'].min()
-        calendar_end = filtered_df['終了予定日'].max()
-        calendar_days = pd.date_range(start=calendar_start, end=calendar_end)
+        # 相続開始日をカレンダーの開始日とし、その週の月曜日に設定
+        inheritance_start = df['相続開始日'].min()
+        calendar_start = inheritance_start - pd.to_timedelta(inheritance_start.weekday(), unit='D')
+        calendar_end = df['終了予定日'].max()
+        calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='W-MON')
 
         # Excelファイルを作成
         wb = Workbook()
@@ -60,6 +56,12 @@ if uploaded_file is not None:
             cell.border = thin_border  # 罫線を追加
             cell.alignment = Alignment(horizontal='center', vertical='center')
 
+        # 選択された工程に関連する作業名をフィルタリング
+        filtered_df = df[df['工程'].isin(selected_tasks)]
+
+        # 欠損値を含む行を削除
+        filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
+
         # 各作業名を列ヘッダーに設定
         task_columns = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
         for task, col in task_columns.items():
@@ -72,11 +74,11 @@ if uploaded_file is not None:
         # 各作業のセルに色をつける
         for index, row in filtered_df.iterrows():
             task_col = task_columns[row['作業名']]
-            start_idx = (row['開始予定日'] - calendar_start).days + 2
-            end_idx = (row['終了予定日'] - calendar_start).days + 2
-            task_days = int(end_idx - start_idx + 1)  # 整数に変換
-            part_length = task_days // 3
-            part_remainder = task_days % 3
+            start_idx = (row['開始予定日'] - calendar_start).days // 7 + 2
+            end_idx = (row['終了予定日'] - calendar_start).days // 7 + 2
+            task_weeks = int(end_idx - start_idx + 1)  # 整数に変換
+            part_length = task_weeks // 3
+            part_remainder = task_weeks % 3
 
             for i in range(start_idx, end_idx + 1):
                 cell = ws.cell(row=i, column=task_col)
