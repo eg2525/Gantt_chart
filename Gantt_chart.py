@@ -47,45 +47,49 @@ if uploaded_file is not None:
         # 罫線の設定
         thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-        # 各作業名を列ヘッダーに設定
-        ws.cell(row=1, column=1, value='日付')
-        task_columns = {task: idx+2 for idx, task in enumerate(df[df['工程'].isin(selected_tasks)]['作業名'].unique())}
-        for task, col in task_columns.items():
-            cell = ws.cell(row=1, column=col, value=task)
+        # 日付を横一列に連続的に並べる
+        ws.cell(row=1, column=1, value='作業名')
+        for i, day in enumerate(calendar_days, start=2):
+            cell = ws.cell(row=1, column=i, value=day.strftime('%Y-%m-%d'))
             cell.font = Font(bold=True)  # 太文字
             cell.border = thin_border  # 罫線を追加
             cell.alignment = Alignment(horizontal='center', vertical='center')
-            ws.column_dimensions[get_column_letter(col)].width = 20  # 列幅を設定
+            ws.column_dimensions[get_column_letter(i)].width = 15  # 列幅を設定
 
-        # 日付を左一列に連続的に並べる
-        for i, day in enumerate(calendar_days, start=2):
-            cell = ws.cell(row=i, column=1, value=day.strftime('%Y-%m-%d'))
+        # 選択された工程に関連する作業名をフィルタリング
+        filtered_df = df[df['工程'].isin(selected_tasks)]
+
+        # 各作業名を行ヘッダーに設定
+        task_rows = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
+        for task, row in task_rows.items():
+            cell = ws.cell(row=row, column=1, value=task)
+            cell.font = Font(bold=True)  # 太文字
             cell.border = thin_border  # 罫線を追加
             cell.alignment = Alignment(horizontal='center', vertical='center')
+            ws.row_dimensions[row].height = 20  # 行高さを設定
 
         # 各作業のセルに色をつける
-        filtered_df = df[df['工程'].isin(selected_tasks)]
         filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
         for index, row in filtered_df.iterrows():
-            task_col = task_columns[row['作業名']]
-            start_idx = (row['開始予定日'] - calendar_start).days // 7 + 2
-            end_idx = (row['終了予定日'] - calendar_start).days // 7 + 2
-            task_weeks = int(end_idx - start_idx + 1)  # 整数に変換
+            task_row = task_rows[row['作業名']]
+            start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
+            end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
+            task_weeks = int(end_col - start_col + 1)  # 整数に変換
             part_length = task_weeks // 3
             part_remainder = task_weeks % 3
 
-            for i in range(start_idx, end_idx + 1):
-                cell = ws.cell(row=i, column=task_col)
+            for i in range(start_col, end_col + 1):
+                cell = ws.cell(row=task_row, column=i)
                 cell.border = thin_border  # 罫線を追加
                 # 色の段階を設定
-                if i < start_idx + part_length + (1 if part_remainder > 0 else 0):
+                if i < start_col + part_length + (1 if part_remainder > 0 else 0):
                     fill_color = colors[0]
-                elif i < start_idx + 2 * part_length + (2 if part_remainder > 1 else 1):
+                elif i < start_col + 2 * part_length + (2 if part_remainder > 1 else 1):
                     fill_color = colors[1]
                 else:
                     fill_color = colors[2]
                 cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type='solid')
-                if i == end_idx:
+                if i == end_col:
                     cell.value = '提出期限'
                     cell.alignment = Alignment(horizontal='center', vertical='center')
 
