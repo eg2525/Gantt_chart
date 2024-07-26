@@ -63,6 +63,7 @@ def create_gantt_chart(df, selected_tasks):
         start_col = (start_date - month_start).days // 7 + 2
         end_col = (end_date - month_start).days // 7 + 2
 
+        # 色を付ける範囲を正確に計算し、適用
         apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border, len(week_starts) + 1)
 
         row += 1
