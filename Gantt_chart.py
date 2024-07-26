@@ -118,4 +118,5 @@ if uploaded_file is not None:
         output.seek(0)
 
         # ダウンロードボタンを表示
-        st.download_button(label='ガントチャートをダウンロード', data=output, file_name='GanttChart.xlsx',
+        st.download_button(label='ガントチャートをダウンロード', data=output, file_name='GanttChart.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
