@@ -106,6 +106,7 @@ def apply_task_colors(ws, task_row, start_col, end_col, colors, border):
 def adjust_column_width(ws):
     for col in ws.columns:
         max_length = 0
+        column = get_column_letter(col[0].column)
         for cell in col:
             if cell.value is None:
                 continue
@@ -114,7 +115,6 @@ def adjust_column_width(ws):
                     max_length = len(cell.value)
             except:
                 pass
-        column = col[0].column_letter
         adjusted_width = max((max_length + 2), 20) if column == 'A' else (max_length + 2)
         ws.column_dimensions[column].width = adjusted_width
     ws.column_dimensions['A'].width = max(ws.column_dimensions['A'].width, 20)
