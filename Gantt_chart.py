@@ -106,8 +106,10 @@ def apply_task_colors(ws, task_row, start_col, end_col, colors, border):
 def adjust_column_width(ws):
     for col in ws.columns:
         max_length = 0
-        column = col[0].column_letter
+        column = col[0].column_letter if not col[0].merged else col[0].value
         for cell in col:
+            if cell.merged:
+                continue
             try:
                 if len(str(cell.value)) > max_length:
                     max_length = len(cell.value)
