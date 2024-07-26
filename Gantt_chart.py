@@ -27,7 +27,7 @@ def create_gantt_chart(df, selected_tasks):
     inheritance_start = df['相続開始日'].min()
     calendar_start = inheritance_start - pd.to_timedelta(inheritance_start.weekday(), unit='D')
     calendar_end = df['終了予定日'].max()
-    calendar_weeks = pd.date_range(start=calendar_start, end=calendar_end, freq='W-MON')
+    calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='D')
 
     wb = Workbook()
     ws = wb.active
@@ -36,11 +36,14 @@ def create_gantt_chart(df, selected_tasks):
     blue_color = '87CEFA'
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
+    month_groups = calendar_days.to_series().groupby(calendar_days.to_period("M"))
+
     start_row = 1
-    for month, group in calendar_weeks.to_series().groupby(calendar_weeks.to_period("M")):
+
+    for month, days in month_groups:
         ws.cell(row=start_row, column=1, value='作業名')
-        for i, week_start in enumerate(group, start=2):
-            cell = ws.cell(row=start_row, column=i, value=week_start.strftime('%Y-%m-%d'))
+        for i, day in enumerate(days, start=2):
+            cell = ws.cell(row=start_row, column=i, value=day.strftime('%Y-%m-%d'))
             apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
             ws.column_dimensions[get_column_letter(i)].width = 15
 
@@ -54,11 +57,15 @@ def create_gantt_chart(df, selected_tasks):
         filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
         for _, row in filtered_df.iterrows():
             task_row = task_rows[row['作業名']]
-            start_week = (row['開始予定日'] - calendar_start).days // 7
-            end_week = (row['終了予定日'] - calendar_start).days // 7
+            start_col = (row['開始予定日'] - days[0]).days + 2
+            end_col = (row['終了予定日'] - days[0]).days + 2
 
-            for col in range(start_week + 2, end_week + 3):
-                apply_task_colors(ws, task_row, col, col, blue_color, thin_border)
+            if start_col < 2:
+                start_col = 2
+            if end_col > len(days) + 1:
+                end_col = len(days) + 1
+
+            apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
 
         start_row += len(task_rows) + 2
 
