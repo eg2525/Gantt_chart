@@ -33,7 +33,7 @@ def create_gantt_chart(df, selected_tasks):
     ws = wb.active
     ws.title = 'ガントチャート'
 
-    colors = ['0DACDC', 'ECDA2F', 'F11D1A']
+    blue_color = '87CEFA'
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     ws.cell(row=1, column=1, value='作業名')
@@ -54,7 +54,7 @@ def create_gantt_chart(df, selected_tasks):
         task_row = task_rows[row['作業名']]
         start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
         end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
-        apply_task_colors(ws, task_row, start_col, end_col, colors, thin_border)
+        apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
 
     adjust_column_width(ws)
     return wb
@@ -67,24 +67,11 @@ def apply_styles(cell, bold=False, border=None, alignment=None):
     if alignment:
         cell.alignment = alignment
 
-def apply_task_colors(ws, task_row, start_col, end_col, colors, border):
-    task_weeks = int(end_col - start_col + 1)
-    part_length = task_weeks // 3
-    part_remainder = task_weeks % 3
-
+def apply_task_colors(ws, task_row, start_col, end_col, color, border):
     for i in range(start_col, end_col + 1):
         cell = ws.cell(row=task_row, column=i)
         cell.border = border
-        if i < start_col + part_length + (1 if part_remainder > 0 else 0):
-            fill_color = colors[0]
-        elif i < start_col + 2 * part_length + (2 if part_remainder > 1 else 1):
-            fill_color = colors[1]
-        else:
-            fill_color = colors[2]
-        cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type='solid')
-        if i == end_col:
-            cell.value = '提出期限'
-            cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
 
 def adjust_column_width(ws):
     for col in ws.columns:
