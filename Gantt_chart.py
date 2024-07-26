@@ -1,5 +1,4 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
@@ -47,7 +46,7 @@ if uploaded_file is not None:
         # 罫線の設定
         thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-        # 日付を横一列に連続的に並べる
+        # 月ごとに日付を横一列に連続的に並べる
         current_row = 1
         ws.cell(row=current_row, column=1, value='作業名')
 
