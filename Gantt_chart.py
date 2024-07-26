@@ -27,7 +27,7 @@ def create_gantt_chart(df, selected_tasks):
     inheritance_start = df['相続開始日'].min()
     calendar_start = inheritance_start - pd.to_timedelta(inheritance_start.weekday(), unit='D')
     calendar_end = df['終了予定日'].max()
-    calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='W-MON')
+    calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='D')
 
     wb = Workbook()
     ws = wb.active
@@ -36,25 +36,38 @@ def create_gantt_chart(df, selected_tasks):
     blue_color = '87CEFA'
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    ws.cell(row=1, column=1, value='作業名')
-    for i, day in enumerate(calendar_days, start=2):
-        cell = ws.cell(row=1, column=i, value=day.strftime('%Y-%m-%d'))
-        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-        ws.column_dimensions[get_column_letter(i)].width = 15
+    month_groups = calendar_days.to_series().groupby(calendar_days.to_period("M"))
 
-    filtered_df = df[df['工程'].isin(selected_tasks)]
-    task_rows = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
-    for task, row in task_rows.items():
-        cell = ws.cell(row=row, column=1, value=task)
-        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-        ws.row_dimensions[row].height = 20
+    start_row = 1
 
-    filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
-    for _, row in filtered_df.iterrows():
-        task_row = task_rows[row['作業名']]
-        start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
-        end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
-        apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
+    for month, days in month_groups:
+        ws.cell(row=start_row, column=1, value='作業名')
+        for i, day in enumerate(days, start=2):
+            cell = ws.cell(row=start_row, column=i, value=day.strftime('%Y-%m-%d'))
+            apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
+            ws.column_dimensions[get_column_letter(i)].width = 15
+
+        filtered_df = df[df['工程'].isin(selected_tasks)]
+        task_rows = {task: idx + start_row + 1 for idx, task in enumerate(filtered_df['作業名'].unique())}
+        for task, row in task_rows.items():
+            cell = ws.cell(row=row, column=1, value=task)
+            apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
+            ws.row_dimensions[row].height = 20
+
+        filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
+        for _, row in filtered_df.iterrows():
+            task_row = task_rows[row['作業名']]
+            start_col = (row['開始予定日'] - days[0]).days + 2
+            end_col = (row['終了予定日'] - days[0]).days + 2
+
+            if start_col < 2:
+                start_col = 2
+            if end_col > len(days) + 1:
+                end_col = len(days) + 1
+
+            apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
+
+        start_row += len(task_rows) + 2
 
     adjust_column_width(ws)
     return wb
