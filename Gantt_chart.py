@@ -63,7 +63,7 @@ def create_gantt_chart(df, selected_tasks):
         start_col = (start_date - month_start).days // 7 + 2
         end_col = (end_date - month_start).days // 7 + 2
 
-        apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
+        apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border, len(week_starts) + 1)
 
         row += 1
 
@@ -78,8 +78,8 @@ def apply_styles(cell, bold=False, border=None, alignment=None):
     if alignment:
         cell.alignment = alignment
 
-def apply_task_colors(ws, task_row, start_col, end_col, color, border):
-    for i in range(start_col, end_col + 1):
+def apply_task_colors(ws, task_row, start_col, end_col, color, border, max_col):
+    for i in range(start_col, min(end_col + 1, max_col)):
         cell = ws.cell(row=task_row, column=i)
         cell.border = border
         cell.fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
