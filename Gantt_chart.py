@@ -34,7 +34,7 @@ if uploaded_file is not None:
         inheritance_start = df['相続開始日'].min()
         calendar_start = inheritance_start - pd.to_timedelta(inheritance_start.weekday(), unit='D')
         calendar_end = df['終了予定日'].max()
-        calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='W-MON')
+        calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='D')
 
         # Excelファイルを作成
         wb = Workbook()
@@ -48,22 +48,19 @@ if uploaded_file is not None:
 
         # 月ごとに日付を横一列に連続的に並べる
         current_row = 1
-        ws.cell(row=current_row, column=1, value='作業名')
-
-        month_groups = calendar_days.to_period('M').unique()
-        for month in month_groups:
-            month_days = calendar_days[calendar_days.to_period('M') == month]
-            for i, day in enumerate(month_days, start=2):
+        for month, group in df.groupby(pd.Grouper(key='開始予定日', freq='M')):
+            # 月ごとのヘッダーを追加
+            current_row += 2  # 2行空ける
+            ws.cell(row=current_row, column=1, value='作業名')
+            for i, day in enumerate(pd.date_range(start=month.replace(day=1), end=(month + pd.offsets.MonthEnd(1)).date()), start=2):
                 cell = ws.cell(row=current_row, column=i, value=day.strftime('%Y-%m-%d'))
                 cell.font = Font(bold=True)  # 太文字
                 cell.border = thin_border  # 罫線を追加
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 ws.column_dimensions[get_column_letter(i)].width = 15  # 列幅を設定
 
-            # 選択された工程に関連する作業名をフィルタリング
-            filtered_df = df[df['工程'].isin(selected_tasks)]
-
-            # 各作業名を行ヘッダーに設定
+            # フィルタリングされた作業名を行ヘッダーに設定
+            filtered_df = group[group['工程'].isin(selected_tasks)]
             task_rows = {task: idx + current_row + 1 for idx, task in enumerate(filtered_df['作業名'].unique())}
             for task, row in task_rows.items():
                 cell = ws.cell(row=row, column=1, value=task)
@@ -76,11 +73,11 @@ if uploaded_file is not None:
             filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
             for index, row in filtered_df.iterrows():
                 task_row = task_rows[row['作業名']]
-                start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
-                end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
-                task_weeks = int(end_col - start_col + 1)  # 整数に変換
-                part_length = task_weeks // 3
-                part_remainder = task_weeks % 3
+                start_col = (row['開始予定日'] - calendar_start).days + 2
+                end_col = (row['終了予定日'] - calendar_start).days + 2
+                task_days = int(end_col - start_col + 1)  # 整数に変換
+                part_length = task_days // 3
+                part_remainder = task_days % 3
 
                 for i in range(start_col, end_col + 1):
                     cell = ws.cell(row=task_row, column=i)
@@ -99,10 +96,6 @@ if uploaded_file is not None:
 
             # 次の月に移動する前に2行の空行を追加
             current_row = max(task_rows.values()) + 2
-
-        # 最初の2行が空行であれば削除
-        if all(ws.cell(row=1, column=col).value is None for col in range(1, ws.max_column + 1)) and all(ws.cell(row=2, column=col).value is None for col in range(1, ws.max_column + 1)):
-            ws.delete_rows(1, 2)
 
         # 列幅を自動調整（作業名の列は最低150px）
         for col in ws.columns:
@@ -125,4 +118,4 @@ if uploaded_file is not None:
         output.seek(0)
 
         # ダウンロードボタンを表示
-        st.download_button(label='ガントチャートをダウンロード', data=output, file_name='GanttChart.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        st.download_button(label='ガントチャートをダウンロード', data=output, file_name='GanttChart.xlsx',
