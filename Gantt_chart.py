@@ -1,4 +1,5 @@
 import streamlit as st
+import numpy as np
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
@@ -23,8 +24,10 @@ def load_data(file):
     return df
 
 def create_gantt_chart(df, selected_tasks):
-    df = df[df['工程'].isin(selected_tasks)]
-    df = df.dropna(subset=['開始予定日', '終了予定日'])
+    inheritance_start = df['相続開始日'].min()
+    calendar_start = inheritance_start - pd.to_timedelta(inheritance_start.weekday(), unit='D')
+    calendar_end = df['終了予定日'].max()
+    calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='W-MON')
 
     wb = Workbook()
     ws = wb.active
@@ -33,48 +36,51 @@ def create_gantt_chart(df, selected_tasks):
     blue_color = '87CEFA'
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # 各月ごとに段落を作成
-    current_month = None
-    row = 1
+    current_month = calendar_start.month
+    start_row = 1
+    add_month_header(ws, start_row, calendar_days, current_month, thin_border)
+    start_row += 1
 
-    for _, task in df.iterrows():
-        start_date = task['開始予定日']
-        end_date = task['終了予定日']
-        
-        # 月が変わるごとに新しい段落を作成
-        if current_month != start_date.month:
-            if current_month is not None:
-                row += 3  # 月ごとに3行の間隔を空ける
-            current_month = start_date.month
-            
-            month_start = start_date.replace(day=1)
-            month_end = (month_start + pd.offsets.MonthEnd(1)).date()
-            week_starts = pd.date_range(start=month_start, end=month_end, freq='W-MON')
-
-            for i, day in enumerate(week_starts, start=2):
-                cell = ws.cell(row=row, column=i, value=day.strftime('%Y-%m-%d'))
-                apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-                ws.column_dimensions[get_column_letter(i)].width = 15
-        
-        # タスク名のセル
-        task_row = row + 1
-        cell = ws.cell(row=task_row, column=1, value=task['作業名'])
+    filtered_df = df[df['工程'].isin(selected_tasks)]
+    task_rows = {task: idx + start_row + 1 for idx, task in enumerate(filtered_df['作業名'].unique())}
+    for task, row in task_rows.items():
+        cell = ws.cell(row=row, column=1, value=task)
         apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-        ws.row_dimensions[task_row].height = 20
+        ws.row_dimensions[row].height = 20
 
-        # 色を付ける範囲を計算して適用
-        for week_start in week_starts:
-            week_end = week_start + pd.Timedelta(days=6)
-            if not (end_date < week_start or start_date > week_end):
-                col = (week_start - month_start).days // 7 + 2
-                cell = ws.cell(row=task_row, column=col)
-                cell.border = thin_border
-                cell.fill = PatternFill(start_color=blue_color, end_color=blue_color, fill_type='solid')
+    filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
+    for _, row in filtered_df.iterrows():
+        task_row = task_rows[row['作業名']]
+        start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
+        end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
 
-        row += 1
+        if ws.cell(row=1, column=start_col).value is None or ws.cell(row=1, column=end_col).value is None:
+            current_month = add_new_month(ws, start_row, calendar_days, current_month, thin_border)
+            start_row = task_row
+
+        apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
 
     adjust_column_width(ws)
     return wb
+
+def add_month_header(ws, start_row, calendar_days, current_month, thin_border):
+    ws.cell(row=start_row, column=1, value='作業名')
+    col = 2
+    for day in calendar_days:
+        if day.month != current_month:
+            break
+        cell = ws.cell(row=start_row, column=col, value=day.strftime('%Y-%m-%d'))
+        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
+        ws.column_dimensions[get_column_letter(col)].width = 15
+        col += 1
+    return col - 1
+
+def add_new_month(ws, start_row, calendar_days, current_month, thin_border):
+    new_month = current_month + 1 if current_month < 12 else 1
+    while ws.cell(row=1, column=start_row).value is not None:
+        start_row += 1
+    add_month_header(ws, start_row, calendar_days, new_month, thin_border)
+    return new_month
 
 def apply_styles(cell, bold=False, border=None, alignment=None):
     if bold:
@@ -83,6 +89,12 @@ def apply_styles(cell, bold=False, border=None, alignment=None):
         cell.border = border
     if alignment:
         cell.alignment = alignment
+
+def apply_task_colors(ws, task_row, start_col, end_col, color, border):
+    for i in range(start_col, end_col + 1):
+        cell = ws.cell(row=task_row, column=i)
+        cell.border = border
+        cell.fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
 
 def adjust_column_width(ws):
     for col in ws.columns:
