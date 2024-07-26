@@ -33,6 +33,7 @@ def create_gantt_chart(df, selected_tasks):
     blue_color = '87CEFA'
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
+    # 各月ごとに段落を作成
     current_month = None
     row = 1
 
@@ -40,6 +41,7 @@ def create_gantt_chart(df, selected_tasks):
         start_date = task['開始予定日']
         end_date = task['終了予定日']
         
+        # 月が変わるごとに新しい段落を作成
         if current_month != start_date.month:
             if current_month is not None:
                 row += 3  # 月ごとに3行の間隔を空ける
@@ -54,15 +56,20 @@ def create_gantt_chart(df, selected_tasks):
                 apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
                 ws.column_dimensions[get_column_letter(i)].width = 15
         
+        # タスク名のセル
         task_row = row + 1
         cell = ws.cell(row=task_row, column=1, value=task['作業名'])
         apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
         ws.row_dimensions[task_row].height = 20
 
-        start_col = (start_date - month_start).days // 7 + 2
-        end_col = (end_date - month_start).days // 7 + 2
-
-        apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border, len(week_starts) + 1)
+        # 色を付ける範囲を計算して適用
+        for week_start in week_starts:
+            week_end = week_start + pd.Timedelta(days=6)
+            if not (end_date < week_start or start_date > week_end):
+                col = (week_start - month_start).days // 7 + 2
+                cell = ws.cell(row=task_row, column=col)
+                cell.border = thin_border
+                cell.fill = PatternFill(start_color=blue_color, end_color=blue_color, fill_type='solid')
 
         row += 1
 
@@ -76,12 +83,6 @@ def apply_styles(cell, bold=False, border=None, alignment=None):
         cell.border = border
     if alignment:
         cell.alignment = alignment
-
-def apply_task_colors(ws, task_row, start_col, end_col, color, border, max_col):
-    for i in range(start_col, min(end_col + 1, max_col)):
-        cell = ws.cell(row=task_row, column=i)
-        cell.border = border
-        cell.fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
 
 def adjust_column_width(ws):
     for col in ws.columns:
