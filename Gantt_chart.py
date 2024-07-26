@@ -36,13 +36,14 @@ def create_gantt_chart(df, selected_tasks):
     blue_color = '87CEFA'
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    current_month = calendar_start.month
-    start_row = 1
-    add_month_header(ws, start_row, calendar_days, current_month, thin_border)
-    start_row += 1
+    ws.cell(row=1, column=1, value='作業名')
+    for i, day in enumerate(calendar_days, start=2):
+        cell = ws.cell(row=1, column=i, value=day.strftime('%Y-%m-%d'))
+        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
+        ws.column_dimensions[get_column_letter(i)].width = 15
 
     filtered_df = df[df['工程'].isin(selected_tasks)]
-    task_rows = {task: idx + start_row + 1 for idx, task in enumerate(filtered_df['作業名'].unique())}
+    task_rows = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
     for task, row in task_rows.items():
         cell = ws.cell(row=row, column=1, value=task)
         apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
@@ -53,34 +54,10 @@ def create_gantt_chart(df, selected_tasks):
         task_row = task_rows[row['作業名']]
         start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
         end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
-
-        if ws.cell(row=1, column=start_col).value is None or ws.cell(row=1, column=end_col).value is None:
-            current_month = add_new_month(ws, start_row, calendar_days, current_month, thin_border)
-            start_row = task_row
-
         apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
 
     adjust_column_width(ws)
     return wb
-
-def add_month_header(ws, start_row, calendar_days, current_month, thin_border):
-    ws.cell(row=start_row, column=1, value='作業名')
-    col = 2
-    for day in calendar_days:
-        if day.month != current_month:
-            break
-        cell = ws.cell(row=start_row, column=col, value=day.strftime('%Y-%m-%d'))
-        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-        ws.column_dimensions[get_column_letter(col)].width = 15
-        col += 1
-    return col - 1
-
-def add_new_month(ws, start_row, calendar_days, current_month, thin_border):
-    new_month = current_month + 1 if current_month < 12 else 1
-    while ws.cell(row=1, column=start_row).value is not None:
-        start_row += 1
-    add_month_header(ws, start_row, calendar_days, new_month, thin_border)
-    return new_month
 
 def apply_styles(cell, bold=False, border=None, alignment=None):
     if bold:
