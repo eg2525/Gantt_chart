@@ -54,8 +54,13 @@ def create_gantt_chart(df, selected_tasks):
         filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
         for _, row in filtered_df.iterrows():
             task_row = task_rows[row['作業名']]
-            start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
-            end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
+            start_col = ((row['開始予定日'] - calendar_start).days // 7) + 2
+            end_col = ((row['終了予定日'] - calendar_start).days // 7) + 2
+
+            if start_col < 2:
+                start_col = 2
+            if end_col > len(group) + 1:
+                end_col = len(group) + 1
 
             apply_task_colors(ws, task_row, start_col, end_col, blue_color, thin_border)
 
