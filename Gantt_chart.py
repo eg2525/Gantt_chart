@@ -24,9 +24,10 @@ def load_data(file):
     return df
 
 def create_gantt_chart(df, selected_tasks):
-    calendar_start = df['開始予定日'].min().replace(day=1)
-    calendar_end = df['終了予定日'].max().replace(day=1) + pd.DateOffset(months=1) - pd.DateOffset(days=1)
-    months = pd.date_range(start=calendar_start, end=calendar_end, freq='MS')
+    inheritance_start = df['相続開始日'].min()
+    calendar_start = inheritance_start - pd.to_timedelta(inheritance_start.weekday(), unit='D')
+    calendar_end = df['終了予定日'].max()
+    calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='W-MON')
 
     wb = Workbook()
     ws = wb.active
@@ -35,43 +36,25 @@ def create_gantt_chart(df, selected_tasks):
     colors = ['0DACDC', 'ECDA2F', 'F11D1A']
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    current_row = 1
+    ws.cell(row=1, column=1, value='作業名')
+    for i, day in enumerate(calendar_days, start=2):
+        cell = ws.cell(row=1, column=i, value=day.strftime('%Y-%m-%d'))
+        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
+        ws.column_dimensions[get_column_letter(i)].width = 15
 
-    for month_start in months:
-        month_end = month_start + pd.DateOffset(months=1) - pd.DateOffset(days=1)
-        days_in_month = pd.date_range(start=month_start, end=month_end, freq='D')
-        
-        # Month title
-        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=len(days_in_month) + 1)
-        cell = ws.cell(row=current_row, column=1, value=month_start.strftime('%Y-%m'))
-        apply_styles(cell, bold=True, alignment=Alignment(horizontal='center', vertical='center'))
-        current_row += 1
-        
-        # Header row with days
-        ws.cell(row=current_row, column=1, value='作業名')
-        for i, day in enumerate(days_in_month, start=2):
-            cell = ws.cell(row=current_row, column=i, value=day.strftime('%d'))
-            apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-            ws.column_dimensions[get_column_letter(i)].width = 3
-        current_row += 1
+    filtered_df = df[df['工程'].isin(selected_tasks)]
+    task_rows = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
+    for task, row in task_rows.items():
+        cell = ws.cell(row=row, column=1, value=task)
+        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
+        ws.row_dimensions[row].height = 20
 
-        filtered_df = df[(df['工程'].isin(selected_tasks)) & (df['開始予定日'] <= month_end) & (df['終了予定日'] >= month_start)]
-
-        task_rows = {task: idx + current_row for idx, task in enumerate(filtered_df['作業名'].unique())}
-        for task, row in task_rows.items():
-            cell = ws.cell(row=row, column=1, value=task)
-            apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-            ws.row_dimensions[row].height = 20
-
-        for _, row in filtered_df.iterrows():
-            task_row = task_rows[row['作業名']]
-            task_start = max(row['開始予定日'], month_start)
-            task_end = min(row['終了予定日'], month_end)
-            start_col = (task_start - month_start).days + 2
-            end_col = (task_end - month_start).days + 2
-            apply_task_colors(ws, task_row, start_col, end_col, colors, thin_border)
-
-        current_row += len(task_rows) + 2
+    filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
+    for _, row in filtered_df.iterrows():
+        task_row = task_rows[row['作業名']]
+        start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
+        end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
+        apply_task_colors(ws, task_row, start_col, end_col, colors, thin_border)
 
     adjust_column_width(ws)
     return wb
@@ -85,9 +68,9 @@ def apply_styles(cell, bold=False, border=None, alignment=None):
         cell.alignment = alignment
 
 def apply_task_colors(ws, task_row, start_col, end_col, colors, border):
-    task_days = int(end_col - start_col + 1)
-    part_length = task_days // 3
-    part_remainder = task_days % 3
+    task_weeks = int(end_col - start_col + 1)
+    part_length = task_weeks // 3
+    part_remainder = task_weeks % 3
 
     for i in range(start_col, end_col + 1):
         cell = ws.cell(row=task_row, column=i)
@@ -106,10 +89,8 @@ def apply_task_colors(ws, task_row, start_col, end_col, colors, border):
 def adjust_column_width(ws):
     for col in ws.columns:
         max_length = 0
-        column = get_column_letter(col[0].column)
+        column = col[0].column_letter
         for cell in col:
-            if cell.value is None:
-                continue
             try:
                 if len(str(cell.value)) > max_length:
                     max_length = len(cell.value)
