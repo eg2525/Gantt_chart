@@ -25,9 +25,9 @@ def load_data(file):
 
 def create_gantt_chart(df, selected_tasks):
     inheritance_start = df['相続開始日'].min()
-    calendar_start = inheritance_start - pd.to_timedelta(inheritance_start.weekday(), unit='D')
-    calendar_end = df['終了予定日'].max()
-    calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='W-MON')
+    calendar_start = inheritance_start.replace(day=1)
+    calendar_end = df['終了予定日'].max().replace(day=1) + pd.DateOffset(months=1) - pd.DateOffset(days=1)
+    calendar_days = pd.date_range(start=calendar_start, end=calendar_end, freq='MS')
 
     wb = Workbook()
     ws = wb.active
@@ -37,13 +37,19 @@ def create_gantt_chart(df, selected_tasks):
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     ws.cell(row=1, column=1, value='作業名')
-    for i, day in enumerate(calendar_days, start=2):
-        cell = ws.cell(row=1, column=i, value=day.strftime('%Y-%m-%d'))
-        apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
-        ws.column_dimensions[get_column_letter(i)].width = 15
+    row_offset = 2
+    for month_start in calendar_days:
+        month_end = (month_start + pd.DateOffset(months=1)) - pd.DateOffset(days=1)
+        col_start = 2
+        for day in pd.date_range(start=month_start, end=month_end, freq='D'):
+            cell = ws.cell(row=1, column=col_start, value=day.strftime('%Y-%m-%d'))
+            apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
+            ws.column_dimensions[get_column_letter(col_start)].width = 15
+            col_start += 1
+        row_offset += len(selected_tasks) + 2
 
     filtered_df = df[df['工程'].isin(selected_tasks)]
-    task_rows = {task: idx+2 for idx, task in enumerate(filtered_df['作業名'].unique())}
+    task_rows = {task: idx + 2 for idx, task in enumerate(filtered_df['作業名'].unique())}
     for task, row in task_rows.items():
         cell = ws.cell(row=row, column=1, value=task)
         apply_styles(cell, bold=True, border=thin_border, alignment=Alignment(horizontal='center', vertical='center'))
@@ -52,9 +58,11 @@ def create_gantt_chart(df, selected_tasks):
     filtered_df = filtered_df.dropna(subset=['開始予定日', '終了予定日'])
     for _, row in filtered_df.iterrows():
         task_row = task_rows[row['作業名']]
-        start_col = (row['開始予定日'] - calendar_start).days // 7 + 2
-        end_col = (row['終了予定日'] - calendar_start).days // 7 + 2
-        apply_task_colors(ws, task_row, start_col, end_col, colors, thin_border)
+        month_diff = (row['開始予定日'].year - calendar_start.year) * 12 + row['開始予定日'].month - calendar_start.month
+        row_offset = (month_diff * (len(selected_tasks) + 2)) + task_row
+        start_col = (row['開始予定日'] - calendar_start).days + 2
+        end_col = (row['終了予定日'] - calendar_start).days + 2
+        apply_task_colors(ws, row_offset, start_col, end_col, colors, thin_border)
 
     adjust_column_width(ws)
     return wb
@@ -68,9 +76,9 @@ def apply_styles(cell, bold=False, border=None, alignment=None):
         cell.alignment = alignment
 
 def apply_task_colors(ws, task_row, start_col, end_col, colors, border):
-    task_weeks = int(end_col - start_col + 1)
-    part_length = task_weeks // 3
-    part_remainder = task_weeks % 3
+    task_days = int(end_col - start_col + 1)
+    part_length = task_days // 3
+    part_remainder = task_days % 3
 
     for i in range(start_col, end_col + 1):
         cell = ws.cell(row=task_row, column=i)
